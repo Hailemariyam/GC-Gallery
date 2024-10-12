@@ -1,0 +1,32 @@
+[
+  {
+    "username": "john_doe",
+    "name": "John Doe",
+    "department": "Computer Science",
+    "photos": {
+      "passport": "assets/images/logo.jpeg",
+      "fullscale": "assets/images/logo.jpeg"
+    },
+    "quote": "Learning is a treasure that will follow its owner everywhere."
+  },
+  {
+    "username": "jane_smith",
+    "name": "Jane Smith",
+    "department": "Mathematics",
+    "photos": {
+      "passport": "assets/images/logo.jpeg",
+      "fullscale": "assets/images/logo.jpeg"
+    },
+    "quote": "Mathematics is the language with which God has written the universe."
+  },
+  {
+    "username": "mike_johnson",
+    "name": "Mike Johnson",
+    "department": "Physics",
+    "photos": {
+      "passport": "assets/images/logo.jpeg",
+      "fullscale": "assets/images/logo.jpeg"
+    },
+    "quote": "Physics is the science of matter, energy, and their interactions."
+  }
+]
