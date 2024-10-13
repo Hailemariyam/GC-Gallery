@@ -1,79 +1,95 @@
+import 'dart:typed_data';
+
+import 'package:flutter/services.dart';
 import 'package:gc_gallery/models/student.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class StudentController extends GetxController {
-  var students = <Student>[].obs;
-  var filteredStudents = <Student>[].obs; // To store filtered results
+  RxList<Student> students = <Student>[
+    Student(
+      name: "Hailemariyam Kebede",
+      username: "WOUR/1000/12",
+      department: "Software Engineering",
+      quote: "Learning never stops",
+      photos: {
+        "passport": "assets/images/logo.jpeg",
+        "fullscale": "assets/images/splash_bg.jpeg",
+      },
+    ),
+    // Add the new students here...
+    Student(
+      username: "WOUR/1028/12",
+      name: "Haregewoyn Menberu",
+      department: "Software Engineering",
+      quote: "ድንግልን ይዞ እረጅም ጉዞ።",
+      photos: {
+        "passport": "assets/images/logo.jpeg",
+        "fullscale": "assets/images/logo.jpeg",
+      },
+    ),
+    Student(
+      username: "WOUR/1746/12",
+      name: "Sewmehon Engda",
+      department: "Software Engineering",
+      quote: "ፍለጋው ንጹህ ለሆነ ለእግዚአብሔር ምስጋና ይገባል።",
+      photos: {
+        "passport": "assets/images/logo.jpeg",
+        "fullscale": "assets/images/logo.jpeg",
+      },
+    ),
+  ].obs;
+
+  RxBool isFullScreen = false.obs;
+  RxInt currentIndex = 0.obs; // To keep track of the selected image index
+  Student? selectedStudent;
+  RxList<Student> filteredStudents = <Student>[].obs;
 
   @override
   void onInit() {
-    super.onInit();
-    loadStudents();
-  }
-
-  Future<void> loadStudents() async {
-    final prefs = await SharedPreferences.getInstance();
-    final studentData = prefs.getString('students') ?? '[]';
-    List<dynamic> studentList = json.decode(studentData);
-    students.assignAll(
-        studentList.map((student) => Student.fromMap(student)).toList());
     filteredStudents.assignAll(students);
+    super.onInit();
   }
 
   void filterStudents(String query) {
     if (query.isEmpty) {
-      // If no query, show all students
       filteredStudents.assignAll(students);
     } else {
       filteredStudents.assignAll(students.where((student) {
-        return student.username.toLowerCase().contains(query.toLowerCase()) ||
-            student.name.toLowerCase().contains(query.toLowerCase()) ||
-            student.email.toLowerCase().contains(query.toLowerCase()) ||
-            student.department.toLowerCase().contains(query.toLowerCase()) ||
-            (student.quote != null &&
-                student.quote!.toLowerCase().contains(
-                    query.toLowerCase())); // Filter by quote if provided
+        return student.name.toLowerCase().contains(query.toLowerCase()) ||
+            student.username.toLowerCase().contains(query.toLowerCase()) ||
+            student.department.toLowerCase().contains(query.toLowerCase());
       }).toList());
     }
   }
 
-  void filterPhotos(String username) {
-    filteredStudents.assignAll(
-        students.where((student) => student.username == username).toList());
+  void setFullScreenStudent(int index) {
+    currentIndex.value = index; // Set the selected index
+    isFullScreen.value = true; // Enable full-screen mode
   }
 
-  void addStudent(Student student) {
-    students.add(student);
-    _saveStudents();
-    filterStudents(""); // Refresh the filter
+  void exitFullScreen() {
+    isFullScreen.value = false;
   }
 
-  void updateStudentInfo(String username, Student updatedStudent) {
-    final studentIndex = students.indexWhere((s) => s.username == username);
-    if (studentIndex != -1) {
-      students[studentIndex] = updatedStudent; // Update student info
-      _saveStudents();
-      filterStudents(""); // Refresh the filter
+  Future<void> downloadImage(String assetPath) async {
+    var status = await Permission.storage.request();
+    if (status.isGranted) {
+      try {
+        final ByteData byteData = await rootBundle.load(assetPath);
+        final Uint8List bytes = byteData.buffer.asUint8List();
+        final result = await ImageGallerySaver.saveImage(bytes);
+        if (result != null) {
+          Get.snackbar('Download Complete', 'Image saved to your device.');
+        } else {
+          Get.snackbar('Error', 'Failed to save image.');
+        }
+      } catch (e) {
+        Get.snackbar('Error', 'Failed to load or save the image.');
+      }
+    } else {
+      Get.snackbar('Permission Denied', 'Storage permission is required.');
     }
-  }
-
-  void updateStudentPhotos(String username, List<String> newPhotos) {
-    final studentIndex = students.indexWhere((s) => s.username == username);
-    if (studentIndex != -1) {
-      students[studentIndex].photos = newPhotos; // Update photos
-      _saveStudents();
-      filterStudents(""); // Refresh the filter
-    }
-  }
-
-  Future<void> _saveStudents() async {
-    final prefs = await SharedPreferences.getInstance();
-    List<String> jsonStudents = students
-        .map((student) =>
-            json.encode(student.toMap())) // Encode using toMap method
-        .toList();
-    await prefs.setString('students', json.encode(jsonStudents));
   }
 }

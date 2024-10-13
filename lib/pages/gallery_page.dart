@@ -1,125 +1,54 @@
 import 'package:flutter/material.dart';
+import 'package:gc_gallery/controllers/student_controller.dart';
 import 'package:get/get.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
-import 'dart:typed_data';
-import 'package:flutter/services.dart';
 
-class StudentController extends GetxController {
-  RxList<Student> students = <Student>[
-    Student(
-      name: "John Doe",
-      username: "john_doe",
-      department: "Computer Science",
-      quote: "Learning never stops",
-      photos: {
-        "passport": "assets/images/logo.jpeg",
-        "fullscale": "assets/images/logo.jpeg",
-      },
-    ),
-    // Add the new students here...
-    Student(
-      username: "jane_smith",
-      name: "Jane Smith",
-      department: "Mathematics",
-      quote:
-          "Mathematics is the language with which God has written the universe.",
-      photos: {
-        "passport": "assets/images/logo.jpeg",
-        "fullscale": "assets/images/logo.jpeg",
-      },
-    ),
-    Student(
-      username: "mike_johnson",
-      name: "Mike Johnson",
-      department: "Physics",
-      quote:
-          "Physics is the science of matter, energy, and their interactions.",
-      photos: {
-        "passport": "assets/images/logo.jpeg",
-        "fullscale": "assets/images/logo.jpeg",
-      },
-    ),
-  ].obs;
-
-  RxBool isFullScreen = false.obs;
-  RxInt currentIndex = 0.obs; // To keep track of the selected image index
-  Student? selectedStudent;
-  RxList<Student> filteredStudents = <Student>[].obs;
-
+class StudentGallery extends StatefulWidget {
   @override
-  void onInit() {
-    filteredStudents.assignAll(students);
-    super.onInit();
-  }
-
-  void filterStudents(String query) {
-    if (query.isEmpty) {
-      filteredStudents.assignAll(students);
-    } else {
-      filteredStudents.assignAll(students.where((student) {
-        return student.name.toLowerCase().contains(query.toLowerCase()) ||
-            student.username.toLowerCase().contains(query.toLowerCase()) ||
-            student.department.toLowerCase().contains(query.toLowerCase());
-      }).toList());
-    }
-  }
-
-  void setFullScreenStudent(int index) {
-    currentIndex.value = index; // Set the selected index
-    isFullScreen.value = true; // Enable full-screen mode
-  }
-
-  void exitFullScreen() {
-    isFullScreen.value = false;
-  }
-
-  Future<void> downloadImage(String assetPath) async {
-    var status = await Permission.storage.request();
-    if (status.isGranted) {
-      try {
-        final ByteData byteData = await rootBundle.load(assetPath);
-        final Uint8List bytes = byteData.buffer.asUint8List();
-        final result = await ImageGallerySaver.saveImage(bytes);
-        if (result != null) {
-          Get.snackbar('Download Complete', 'Image saved to your device.');
-        } else {
-          Get.snackbar('Error', 'Failed to save image.');
-        }
-      } catch (e) {
-        Get.snackbar('Error', 'Failed to load or save the image.');
-      }
-    } else {
-      Get.snackbar('Permission Denied', 'Storage permission is required.');
-    }
-  }
+  _StudentGalleryState createState() => _StudentGalleryState();
 }
 
-class Student {
-  final String name;
-  final String username;
-  final String department;
-  final String quote;
-  final Map<String, String> photos;
-
-  Student({
-    required this.name,
-    required this.username,
-    required this.department,
-    required this.quote,
-    required this.photos,
-  });
-}
-
-class StudentGallery extends StatelessWidget {
+class _StudentGalleryState extends State<StudentGallery>
+    with SingleTickerProviderStateMixin {
   final StudentController studentController = Get.put(StudentController());
   final TextEditingController searchController = TextEditingController();
+
+  late AnimationController _slideController;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize the AnimationController and the SlideTransition animation.
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1), // Start from bottom
+      end: Offset.zero, // End at its original position
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeInOut,
+    ));
+
+    // Start the animation
+    _slideController.forward();
+  }
+
+  @override
+  void dispose() {
+    _slideController.dispose();
+    searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Student Gallery'),
+        title: const Text('Student Gallery'),
       ),
       body: Column(
         children: [
@@ -130,7 +59,7 @@ class StudentGallery extends StatelessWidget {
               onChanged: (value) {
                 studentController.filterStudents(value);
               },
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Search by username, name, or department',
                 border: OutlineInputBorder(),
               ),
@@ -158,18 +87,38 @@ class StudentGallery extends StatelessWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Image.asset(student.photos['fullscale']!),
-                            SizedBox(height: 10),
-                            Text(student.name, style: TextStyle(fontSize: 24)),
-                            SizedBox(height: 10), // Add some spacing
+                            Hero(
+                              tag: 'student-photo-${student.username}',
+                              child: Image.asset(student.photos['fullscale']!,
+                                  width: 300, height: 300, fit: BoxFit.cover),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              student.name,
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              student.department,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
                             Center(
-                              // Center the quote text
                               child: Text(
-                                student.quote ?? '',
-                                textAlign:
-                                    TextAlign.center, // Center align text
-                                style:
-                                    TextStyle(fontSize: 16, color: Colors.grey),
+                                student.quote,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey,
+                                  fontFamily: 'RobotoItalic',
+                                ),
                               ),
                             ),
                           ],
@@ -179,56 +128,117 @@ class StudentGallery extends StatelessWidget {
                   ),
                 );
               } else {
-                // Grid view of student photos
+                // Grid view of student photos with Slide Animation
                 return GridView.builder(
-                  itemCount: studentController.filteredStudents.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2),
-                  itemBuilder: (context, index) {
-                    final student = studentController.filteredStudents[index];
-                    return GestureDetector(
-                      onTap: () {
-                        studentController.setFullScreenStudent(index);
-                      },
-                      onLongPress: () {
-                        studentController
-                            .downloadImage(student.photos['passport']!);
-                      },
-                      child: Card(
-                        child: Column(
-                          children: [
-                            Expanded(
-                              child: Image.asset(
-                                student.photos['passport']!,
-                                height: 100,
-                              ),
+                    itemCount: studentController.filteredStudents.length,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10.0,
+                      mainAxisSpacing: 10.0,
+                      childAspectRatio: 0.8,
+                    ),
+                    itemBuilder: (context, index) {
+                      final student = studentController.filteredStudents[index];
+                      return GestureDetector(
+                        onTap: () {
+                          studentController.setFullScreenStudent(index);
+                        },
+                        onLongPress: () {
+                          studentController
+                              .downloadImage(student.photos['passport']!);
+                        },
+                        child: SlideTransition(
+                          position:
+                              _slideAnimation, // Apply the slide animation
+                          child: Card(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16.0),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Column(
-                                children: [
-                                  Text(student.name,
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold)),
-                                  SizedBox(height: 5), // Add some spacing
-                                  Center(
-                                    // Center the quote text
-                                    child: Text(
-                                      student.quote ?? '',
-                                      textAlign:
-                                          TextAlign.center, // Center align text
-                                      style: TextStyle(color: Colors.grey),
+                            elevation:
+                                5, // Adds a shadow effect for better separation
+                            child: Stack(
+                              children: [
+                                // Positioned widget behind the passport image
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: Container(
+                                    width: 80,
+                                    height: 80,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8.0),
+                                      border: Border.all(
+                                          color: Colors.white,
+                                          width: 2), // Add border
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.3),
+                                          spreadRadius: 2,
+                                          blurRadius: 5,
+                                        ),
+                                      ],
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8.0),
+                                      child: Image.asset(
+                                        student.photos['fullscale']!,
+                                        fit: BoxFit.cover,
+                                      ),
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+
+                                // Passport image is on top
+                                Column(
+                                  children: [
+                                    Expanded(
+                                      child: Hero(
+                                        tag:
+                                            'student-photo-${student.username}',
+                                        child: Image.asset(
+                                          student.photos['passport']!,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Column(
+                                        children: [
+                                          Text(student.name,
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontFamily: 'Roboto',
+                                                  fontSize: 18)),
+                                          const SizedBox(height: 5),
+                                          Text(student.department,
+                                              style: const TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey)),
+                                          const SizedBox(height: 5),
+                                          Center(
+                                            child: Text(
+                                              student.quote,
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                color: Colors.grey,
+                                                fontFamily: 'RobotoItalic',
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                );
+                      );
+                    });
               }
             }),
           ),
